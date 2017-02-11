@@ -1,5 +1,5 @@
 [root]
-name = "smez-rs"
+name = "smaz-rs"
 version = "0.1.0"
 dependencies = [
  "gcc 0.3.43 (registry+https://github.com/rust-lang/crates.io-index)",

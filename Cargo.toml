@@ -1,5 +1,5 @@
 [package]
-name = "smez-rs"
+name = "smaz-rs"
 version = "0.1.0"
 authors = ["Zeke Sonxx <zeke@zekesonxx.com>"]
 build = "build.rs"
