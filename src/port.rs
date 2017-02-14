@@ -1,6 +1,6 @@
 
 /// Compression codebook
-pub const SMAZ_CB: [&'static str; 254] = [
+pub static SMAZ_CB: [&'static str; 254] = [
 " ", "the", "e", "t", "a", "of", "o", "and", "i", "n", "s", "e ", "r", " th",
 " t", "in", "he", "th", "h", "he ", "to", "\r\n", "l", "s ", "d", " a", "an",
 "er", "c", " o", "d ", "on", " of", "re", "of ", "t ", ", ", "is", "u", "at",
@@ -24,6 +24,7 @@ pub const SMAZ_CB: [&'static str; 254] = [
 "e, ", " it", "whi", " ma", "ge", "x", "e c", "men", ".com"
 ];
 
+
 fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
     if buffer.is_empty() {
         return;
@@ -39,33 +40,32 @@ fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
 
 #[allow(needless_range_loop)]
 pub fn raw_compress(input: &[u8]) -> Vec<u8> {
-    let mut input = Vec::from(input);
+    let mut inputoffset = 0usize;
     let mut output = Vec::with_capacity(input.len());
-    let mut verbatim_buffer: Vec<u8> = vec![];
+    let mut verbatim_buffer: Vec<u8> = Vec::with_capacity(32);
 
-    while !input.is_empty() {
+    while inputoffset < input.len() {
 
         // We're going to start by trying to find a code table entry
         // This works by starting with the longest entries (7 chars)
         // and then working down to looking for 1 char entries.
         let mut j = 7;
         let mut in_codetable = false;
-        if j > input.len() {
-            j = input.len();
+
+        if j > input.len()-inputoffset {
+            j = input.len()-inputoffset;
         }
-        while j > 0 {
-            if in_codetable {
-                break;
-            }
+
+        while j > 0 && !in_codetable {
             for index in 0..SMAZ_CB.len() {
-                if *SMAZ_CB[index].as_bytes() == input[..j] {
+                if *SMAZ_CB[index].as_bytes() == input[inputoffset..inputoffset+j] {
                     // We found a code table entry, so flush the verbatim buffer,
                     // add the byte for the code table entry we found,
                     // and finally remove as many chars from `input` as the
                     // entry was long.
                     flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
                     output.push(index as u8);
-                    input.drain(0..j);
+                    inputoffset += j;
                     in_codetable = true;
                     break;
                 }
@@ -77,13 +77,14 @@ pub fn raw_compress(input: &[u8]) -> Vec<u8> {
         // If we didn't find it anywhere in the code table
         // add it to the verbatim buffer
         if !in_codetable {
-            verbatim_buffer.push(input.remove(0));
+            verbatim_buffer.push(input[inputoffset]);
+            inputoffset += 1;
         }
 
 
         // Flush the verbatim buffer if we've hit the 256 char limit
         // or if we've hit the end of the string.
-        if verbatim_buffer.len() == 256 || input.is_empty() {
+        if verbatim_buffer.len() == 256 || input.len() == inputoffset {
             flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
         }
     }
@@ -157,4 +158,57 @@ pub fn decompress(input: &[u8]) -> Vec<u8> {
     }
     output.shrink_to_fit();
     output
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use test::Bencher;
+    use rand::{thread_rng, Rng};
+
+    macro_rules! compress_check_decompress {
+        ($input: expr, $correct: expr) => (
+            let compressed = compress($input);
+            assert_eq!(compressed.as_slice(), $correct);
+            assert_eq!(decompress(compressed.as_slice()), $input);
+        )
+    }
+
+    #[test]
+    fn basic_tests() {
+        // some generic ones
+        compress_check_decompress!(b"a simple string", b"\xA3\xD4\x2D\x3C\x57\x3E\xC3\x46");
+        compress_check_decompress!(b"http://google.com", b"\x43\x3B\x06\x06\x3B\x57\xFD");
+
+        // some specially crafted ones
+
+        // ends with a literal string
+        compress_check_decompress!(b"there there DDD", b"\xD2\x0D\xA0\x00\xFF\x02\x44\x44\x44");
+    }
+
+    lazy_static! {
+        static ref FIXTURE_LINES: Vec<&'static str> = include_str!("../test-fixture.txt").lines().collect();
+    }
+
+    #[bench]
+    fn bench_rust_ver(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        b.iter(|| {
+            let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
+            let compressed = raw_compress(line);
+            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+        });
+    }
+
+    #[bench]
+    fn bench_c_ver(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        b.iter(|| {
+            let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
+            let compressed = super::super::smaz_compress_clean(line);
+            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+        });
+    }
 }
