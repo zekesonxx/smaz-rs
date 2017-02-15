@@ -173,7 +173,7 @@ pub fn compress(input: &[u8]) -> Vec<u8> {
     if worst_case < output.len() {
         output.clear();
         output.reserve(worst_case);
-        for chunk in Vec::from(input).chunks(256) {
+        for chunk in input.chunks(256) {
             if chunk.len() == 1 {
                 output.push(254);
                 output.push(chunk[0]);
