@@ -190,7 +190,6 @@ pub fn compress(input: &[u8]) -> Vec<u8> {
 }
 
 pub fn decompress(input: &[u8]) -> Vec<u8> {
-    let input = Vec::from(input);
     // rough guess is 50% or worse compression,
     // just to try to minimize reallocations.
     let mut output = Vec::with_capacity(input.len()*2);
