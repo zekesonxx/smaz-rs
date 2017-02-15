@@ -1,10 +1,12 @@
 
 #![allow(dead_code)]
+#![allow(unknown_lints)]
 #![feature(test)]
 extern crate test;
 extern crate rand;
 extern crate libc;
 #[macro_use] extern crate lazy_static;
+extern crate itertools;
 use libc::c_int;
 
 mod port;

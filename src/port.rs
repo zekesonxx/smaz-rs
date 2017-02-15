@@ -1,6 +1,7 @@
 
 
 use std::cmp;
+use itertools::multipeek;
 
 /// Compression codebook
 pub static SMAZ_CB: [&'static str; 254] = [
@@ -118,7 +119,7 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
                 for i in $lenarr.iter() {
                     if input!($len) == (*SMAZ_CB[*i as usize].as_bytes()) {
                         $opcode = Some(*i);
-                        inputoffset += SMAZ_CB[*i as usize].len();
+                        inputoffset += $len;
                         break;
                     }
                 }
@@ -166,8 +167,79 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
     output
 }
 
+#[allow(while_let_on_iterator)]
+#[allow(explicit_iter_loop)]
+pub fn multipeek_raw_compress(input: &[u8]) -> Vec<u8> {
+    let mut output = Vec::with_capacity(input.len());
+    let mut verbatim_buffer: Vec<u8> = Vec::with_capacity(32);
+    let mut iter = multipeek(input.iter());
+
+    macro_rules! findlen {
+        ($len: expr, $lenarr: expr, $string: expr, $opcode: expr) => (
+            if $string.len() >= $len && $opcode.is_none() {
+                $string.truncate($len);
+                for i in $lenarr.iter() {
+                    if *$string.as_slice() == (*SMAZ_CB[*i as usize].as_bytes()) {
+                        $opcode = Some(*i);
+                        break;
+                    }
+                }
+            }
+        )
+    }
+
+    while let Some(c) = iter.next() {
+
+        let mut string: Vec<u8> = Vec::with_capacity(7);
+        let mut opcode: Option<u8> = None;
+
+        string.push(*c);
+        while string.len() < 7 {
+            if let Some(c) = iter.peek() {
+                string.push(**c);
+            } else {
+                break;
+            }
+        }
+
+        if string.len() == 7 && string.as_slice() == b"http://" {
+            opcode = Some(67);
+        }
+
+        findlen!(5, SMAZ_CB_LEN5, string, opcode);
+        findlen!(4, SMAZ_CB_LEN4, string, opcode);
+        findlen!(3, SMAZ_CB_LEN3, string, opcode);
+        findlen!(2, SMAZ_CB_LEN2, string, opcode);
+        findlen!(1, SMAZ_CB_LEN1, string, opcode);
+
+
+        // If we didn't find it anywhere in the code table
+        // add it to the verbatim buffer
+        if let Some(opcode) = opcode {
+            flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
+            output.push(opcode);
+            for _ in 0..SMAZ_CB[opcode as usize].len()-1 {
+                iter.next();
+            }
+        } else {
+            verbatim_buffer.push(*c);
+        }
+
+
+        // Flush the verbatim buffer if we've hit the 256 char limit
+        // or if we've hit the end of the string.
+        if verbatim_buffer.len() == 256 {
+            flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
+        }
+        iter.reset_peek();
+    }
+    flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
+    output.shrink_to_fit();
+    output
+}
+
 pub fn compress(input: &[u8]) -> Vec<u8> {
-    let mut output = loopless_raw_compress(input);
+    let mut output = multipeek_raw_compress(input);
 
     // Worst-case scenario resolution
     let worst_case = input.len()+(2*(input.len())/256);
@@ -295,6 +367,16 @@ mod tests {
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
             let compressed = raw_compress(line);
+            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+        });
+    }
+
+    #[bench]
+    fn bench_iter_rust_ver(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        b.iter(|| {
+            let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
+            let compressed = multipeek_raw_compress(line);
             assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
         });
     }
