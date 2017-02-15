@@ -1,4 +1,7 @@
 
+
+use std::cmp;
+
 /// Compression codebook
 pub static SMAZ_CB: [&'static str; 254] = [
 " ", "the", "e", "t", "a", "of", "o", "and", "i", "n", "s", "e ", "r", " th",
@@ -125,12 +128,10 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
 
     while inputoffset < input.len() {
 
-        let mut maxlen = 7;
+        // length of the remainder of the string,
+        // otherwise length 7 (the longest opcode)
+        let maxlen = cmp::min(input.len()-inputoffset, 7);
         let mut opcode: Option<u8> = None;
-
-        if maxlen > input.len()-inputoffset {
-            maxlen = input.len()-inputoffset;
-        }
 
         if maxlen == 7 && input!(7) == *b"http://" {
             opcode = Some(67);
