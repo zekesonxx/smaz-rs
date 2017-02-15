@@ -362,7 +362,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_rust_ver(b: &mut Bencher) {
+    fn bench_orig_rust_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
@@ -372,7 +372,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_iter_rust_ver(b: &mut Bencher) {
+    fn bench_multipeek_rust_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
@@ -382,7 +382,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_new_rust_ver(b: &mut Bencher) {
+    fn bench_loopless_rust_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
