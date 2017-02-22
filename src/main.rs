@@ -7,7 +7,9 @@ extern crate rand;
 extern crate libc;
 #[macro_use] extern crate lazy_static;
 extern crate itertools;
+//extern crate flame;
 use libc::c_int;
+
 
 mod port;
 
@@ -112,4 +114,5 @@ fn main() {
         println!("         {:?}", String::from_utf8(rustver_de));
 
     }
+    //flame::dump_html(&mut ::std::fs::File::create("flame-graph.html").unwrap()).unwrap();
 }

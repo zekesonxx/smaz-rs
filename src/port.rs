@@ -2,6 +2,7 @@
 
 use std::cmp;
 use itertools::multipeek;
+//use flame;
 
 /// Compression codebook
 pub static SMAZ_CB: [&'static str; 254] = [
@@ -40,13 +41,16 @@ fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
     if buffer.is_empty() {
         return;
     } else if buffer.len() == 1 {
+        //flame::start("flushing buffer");
         output.push(254);
         output.append(buffer);
     } else {
+        //flame::start("flushing buffer");
         output.push(255);
         output.push((buffer.len()-1) as u8);
         output.append(buffer);
     }
+    //flame::end("flushing buffer");
 }
 
 #[allow(needless_range_loop)]
@@ -105,9 +109,12 @@ pub fn raw_compress(input: &[u8]) -> Vec<u8> {
 
 #[allow(explicit_iter_loop)]
 pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
+    //flame::start("loopless_raw_compress");
+    //flame::start("allocations");
     let mut inputoffset = 0usize;
     let mut output = Vec::with_capacity(input.len());
     let mut verbatim_buffer: Vec<u8> = Vec::with_capacity(32);
+    //flame::end("allocations");
 
     macro_rules! input {
         ($pos: expr) => (input[inputoffset..inputoffset+$pos])
@@ -116,6 +123,7 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
     macro_rules! findlen {
         ($len: expr, $lenarr: expr, $maxlen: expr, $opcode: expr) => (
             if $maxlen >= $len && $opcode.is_none() {
+                //flame::start(concat!("length: ", $len));
                 for i in $lenarr.iter() {
                     if input!($len) == (*SMAZ_CB[*i as usize].as_bytes()) {
                         $opcode = Some(*i);
@@ -123,10 +131,10 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
                         break;
                     }
                 }
+                //flame::end(concat!("length: ", $len));
             }
         )
     }
-
     while inputoffset < input.len() {
 
         // length of the remainder of the string,
@@ -138,12 +146,14 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
             opcode = Some(67);
             inputoffset += 7;
         }
-
+        //let label = format!("iterating on {:?}", &input!(maxlen));
+        //flame::start(label.clone());
         findlen!(5, SMAZ_CB_LEN5, maxlen, opcode);
         findlen!(4, SMAZ_CB_LEN4, maxlen, opcode);
         findlen!(3, SMAZ_CB_LEN3, maxlen, opcode);
         findlen!(2, SMAZ_CB_LEN2, maxlen, opcode);
         findlen!(1, SMAZ_CB_LEN1, maxlen, opcode);
+        //flame::end(label);
 
 
         // If we didn't find it anywhere in the code table
@@ -164,6 +174,7 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
         }
     }
     output.shrink_to_fit();
+    //flame::end("loopless_raw_compress");
     output
 }
 
@@ -188,9 +199,10 @@ pub fn multipeek_raw_compress(input: &[u8]) -> Vec<u8> {
         )
     }
 
+    let mut string: Vec<u8> = Vec::with_capacity(7);
     while let Some(c) = iter.next() {
+        string.clear();
 
-        let mut string: Vec<u8> = Vec::with_capacity(7);
         let mut opcode: Option<u8> = None;
 
         string.push(*c);
@@ -239,7 +251,7 @@ pub fn multipeek_raw_compress(input: &[u8]) -> Vec<u8> {
 }
 
 pub fn compress(input: &[u8]) -> Vec<u8> {
-    let mut output = multipeek_raw_compress(input);
+    let mut output = loopless_raw_compress(input);
 
     // Worst-case scenario resolution
     let worst_case = input.len()+(2*(input.len())/256);
@@ -362,7 +374,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_orig_rust_ver(b: &mut Bencher) {
+    fn bench_compress_orig_rust_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
@@ -372,7 +384,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_multipeek_rust_ver(b: &mut Bencher) {
+    fn bench_compress_multipeek_rust_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
@@ -382,7 +394,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_loopless_rust_ver(b: &mut Bencher) {
+    fn bench_compress_loopless_rust_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
@@ -392,12 +404,33 @@ mod tests {
     }
 
     #[bench]
-    fn bench_c_ver(b: &mut Bencher) {
+    fn bench_compress_c_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
             let compressed = super::super::smaz_compress_clean(line);
             assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+        });
+    }
+
+
+    #[bench]
+    fn bench_decompress_rust(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        b.iter(|| {
+            let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
+            let compressed = super::super::smaz_compress_clean(line);
+            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+        });
+    }
+
+    #[bench]
+    fn bench_decompress_c(b: &mut Bencher) {
+        let mut rng = thread_rng();
+        b.iter(|| {
+            let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
+            let compressed = super::super::smaz_compress_clean(line);
+            assert_eq!(super::super::smaz_decompress_clean(compressed.as_slice()).as_slice(), line);
         });
     }
 }
