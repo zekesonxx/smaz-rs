@@ -38,7 +38,7 @@ fn smaz_compress_clean(input: &[u8]) -> Vec<u8> {
 
 fn smaz_decompress_clean(input: &[u8]) -> Vec<u8> {
     let mut input = Vec::from(input);
-    let outlen = input.len()*9;
+    let outlen = input.len()*3;
     let mut output: Vec<u8> = Vec::with_capacity(outlen);
     unsafe {
         let n = smaz_decompress(input.as_mut_ptr(),

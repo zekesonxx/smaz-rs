@@ -38,19 +38,14 @@ pub const SMAZ_CB_LEN5: [u8; 3] = [43, 100, 210];
 
 
 fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
-    if buffer.is_empty() {
-        return;
-    } else if buffer.len() == 1 {
-        //flame::start("flushing buffer");
+    if buffer.len() == 1 {
         output.push(254);
         output.append(buffer);
-    } else {
-        //flame::start("flushing buffer");
+    } else if !buffer.is_empty() {
         output.push(255);
         output.push((buffer.len()-1) as u8);
         output.append(buffer);
     }
-    //flame::end("flushing buffer");
 }
 
 #[allow(needless_range_loop)]
@@ -109,12 +104,9 @@ pub fn raw_compress(input: &[u8]) -> Vec<u8> {
 
 #[allow(explicit_iter_loop)]
 pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
-    //flame::start("loopless_raw_compress");
-    //flame::start("allocations");
     let mut inputoffset = 0usize;
     let mut output = Vec::with_capacity(input.len());
     let mut verbatim_buffer: Vec<u8> = Vec::with_capacity(32);
-    //flame::end("allocations");
 
     macro_rules! input {
         ($pos: expr) => (input[inputoffset..inputoffset+$pos])
@@ -123,7 +115,6 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
     macro_rules! findlen {
         ($len: expr, $lenarr: expr, $maxlen: expr, $opcode: expr) => (
             if $maxlen >= $len && $opcode.is_none() {
-                //flame::start(concat!("length: ", $len));
                 for i in $lenarr.iter() {
                     if input!($len) == (*SMAZ_CB[*i as usize].as_bytes()) {
                         $opcode = Some(*i);
@@ -131,7 +122,6 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
                         break;
                     }
                 }
-                //flame::end(concat!("length: ", $len));
             }
         )
     }
@@ -146,20 +136,19 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
             opcode = Some(67);
             inputoffset += 7;
         }
-        //let label = format!("iterating on {:?}", &input!(maxlen));
-        //flame::start(label.clone());
         findlen!(5, SMAZ_CB_LEN5, maxlen, opcode);
         findlen!(4, SMAZ_CB_LEN4, maxlen, opcode);
         findlen!(3, SMAZ_CB_LEN3, maxlen, opcode);
         findlen!(2, SMAZ_CB_LEN2, maxlen, opcode);
         findlen!(1, SMAZ_CB_LEN1, maxlen, opcode);
-        //flame::end(label);
 
 
         // If we didn't find it anywhere in the code table
         // add it to the verbatim buffer
         if let Some(opcode) = opcode {
-            flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
+            if !verbatim_buffer.is_empty() {
+                flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
+            }
             output.push(opcode);
         } else {
             verbatim_buffer.push(input[inputoffset]);
@@ -169,12 +158,11 @@ pub fn loopless_raw_compress(input: &[u8]) -> Vec<u8> {
 
         // Flush the verbatim buffer if we've hit the 256 char limit
         // or if we've hit the end of the string.
-        if input.len() == inputoffset || verbatim_buffer.len() == 256 {
+        if !verbatim_buffer.is_empty() && (input.len() == inputoffset || verbatim_buffer.len() == 256) {
             flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
         }
     }
     output.shrink_to_fit();
-    //flame::end("loopless_raw_compress");
     output
 }
 
