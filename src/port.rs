@@ -183,7 +183,6 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
     }
 
     let mut opcode: Option<u8>;
-    let mut check = Vec::with_capacity(6);
 
     while inputoffset < input.len() {
         // length of the remainder of the string,
@@ -202,22 +201,15 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
             opcode = Some(67);
             inputoffset += 7;
         } else {
-            // Reset the check array
-            // we do this instead of remaking a vector to avoid allocations
-            check.clear();
-            check.push(5);
-            check.extend(&input!(maxlen));
 
             for len in (0..maxlen+1).rev() {
-                check.truncate(1+len);
-                check[0] = len as u8;
                 let index = SORTED_CB.binary_search_by(|probe| {
-                    probe[..probe.len()-1].cmp(check.as_slice())
-                    //^ compares probe to check
-                    // as opposed to:
-                    //check.as_slice().cmp(&probe[..probe.len()-1]).reverse()
-                    //^ compares check to probe
-                    // Benchmarks ~500ns slower.
+                    use std::cmp::Ordering::*;
+                    match probe[0].cmp(&(len as u8)) {
+                        Less => Less,
+                        Greater => Greater,
+                        Equal => probe[1..len+1].cmp(&input!(len))
+                    }
                 });
 
                 if let Ok(pos) = index {
@@ -348,10 +340,11 @@ pub fn generate_opcode_len_arrays() {
 
 }
 
+#[allow(needless_range_loop)]
 pub fn generate_compression_codebook() {
     let mut book: Vec<String> = vec![];
-    for j in 0..SMAZ_CB.len() as u8 {
-        let element = SMAZ_CB[j as usize];
+    for j in 0..SMAZ_CB.len() {
+        let element = SMAZ_CB[j];
         book.push(format!("b\"\\x{:02X}{}\\x{:02X}\"", element.len(), element.replace('\r', "\\r").replace('\n', "\\n").replace('"', "\\\""),
                                                        j));
     }
