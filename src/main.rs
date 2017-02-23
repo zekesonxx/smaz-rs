@@ -6,8 +6,6 @@ extern crate test;
 extern crate rand;
 extern crate libc;
 #[macro_use] extern crate lazy_static;
-extern crate itertools;
-//extern crate flame;
 use libc::c_int;
 
 
