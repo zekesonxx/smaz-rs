@@ -237,7 +237,7 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
                 if let Ok(pos) = index {
                     // Found the opcode in question
                     // Add it to the array and continue
-                    opcode = Some(SORTED_CB[pos][len+1]);
+                    opcode = Some({SORTED_CB[pos][len+1]});
                     inputoffset += len;
                     break;
                 }
