@@ -88,6 +88,8 @@ pub const SMAZ_CB_LEN4: [u8; 8] = [48, 86, 93, 103, 128, 155, 198, 253];
 pub const SMAZ_CB_LEN5: [u8; 3] = [43, 100, 210];
 
 
+pub const SMAZ_CHARS_USED: [u8; 36] = [10, 13, 32, 34, 44, 45, 46, 47, 58, 60, 61, 62, 84, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 114, 115, 116, 117, 118, 119, 120, 121, 122];
+
 
 fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
     if buffer.len() == 1 {
@@ -200,8 +202,7 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
         if input[inputoffset] == b'h' && input.len()-inputoffset >= 7 && input!(7) == *b"http://" {
             opcode = Some(67);
             inputoffset += 7;
-        } else {
-
+        } else if SMAZ_CHARS_USED.contains(&input[inputoffset]) {
             for len in (0..maxlen+1).rev() {
                 let index = SORTED_CB.binary_search_by(|probe| {
                     use std::cmp::Ordering::*;
@@ -350,6 +351,20 @@ pub fn generate_compression_codebook() {
     }
     println!("pub static SMAZ_COMPRESSION_CB: [&[u8]; {}] = [{}];", book.len(), book.join(", "));
 }
+
+pub fn list_contains_characters() {
+    let mut chars: Vec<u8> = vec![];
+    for entry in SMAZ_CB.iter() {
+        for c in entry.as_bytes() {
+            if !chars.contains(c) {
+                chars.push(*c);
+            }
+        }
+    }
+    chars.sort();
+    println!("chars in use: {:?}", chars);
+}
+
 
 #[cfg(test)]
 mod tests {
