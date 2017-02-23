@@ -2,6 +2,8 @@
 
 use std::cmp;
 
+/// Compression Codebook
+/// This is in the format: `[length of string][string][opcode for string]`
 pub static SMAZ_COMPRESSION_CB: [&[u8]; 254] = [b"\x01 \x00", b"\x03the\x01",
 b"\x01e\x02", b"\x01t\x03", b"\x01a\x04", b"\x02of\x05", b"\x01o\x06",
 b"\x03and\x07", b"\x01i\x08", b"\x01n\x09", b"\x01s\x0A", b"\x02e \x0B",
@@ -56,7 +58,7 @@ b"\x03e, \xF5", b"\x03 it\xF6", b"\x03whi\xF7", b"\x03 ma\xF8", b"\x02ge\xF9",
 b"\x01x\xFA", b"\x03e c\xFB", b"\x03men\xFC", b"\x04.com\xFD"];
 
 
-/// Compression codebook
+/// Decompression Codebook
 pub static SMAZ_CB: [&'static str; 254] = [
 " ", "the", "e", "t", "a", "of", "o", "and", "i", "n", "s", "e ", "r", " th",
 " t", "in", "he", "th", "h", "he ", "to", "\r\n", "l", "s ", "d", " a", "an",
@@ -81,14 +83,32 @@ pub static SMAZ_CB: [&'static str; 254] = [
 "e, ", " it", "whi", " ma", "ge", "x", "e c", "men", ".com"
 ];
 
-pub const SMAZ_CB_LEN1: [u8; 33] = [0, 2, 3, 4, 6, 8, 9, 10, 12, 18, 22, 24, 28, 38, 44, 45, 49, 57, 59, 60, 65, 81, 83, 90, 101, 109, 110, 197, 204, 219, 222, 225, 250];
-pub const SMAZ_CB_LEN2: [u8; 121] = [5, 11, 14, 15, 16, 17, 20, 21, 23, 25, 26, 27, 29, 30, 31, 33, 35, 36, 37, 39, 41, 42, 46, 47, 51, 52, 53, 54, 56, 58, 61, 62, 66, 69, 71, 73, 74, 75, 77, 79, 80, 84, 85, 87, 88, 91, 92, 94, 95, 96, 98, 102, 104, 106, 108, 111, 114, 115, 117, 120, 121, 123, 125, 127, 129, 130, 131, 136, 137, 138, 139, 144, 145, 147, 150, 151, 152, 153, 157, 163, 164, 165, 166, 169, 171, 173, 178, 179, 180, 182, 183, 186, 187, 189, 192, 194, 195, 196, 200, 205, 208, 212, 214, 215, 220, 221, 223, 224, 226, 228, 230, 232, 234, 235, 236, 237, 239, 240, 241, 242, 249];
-pub const SMAZ_CB_LEN3: [u8; 88] = [1, 7, 13, 19, 32, 34, 40, 50, 55, 63, 64, 68, 70, 72, 76, 78, 82, 89, 97, 99, 105, 107, 112, 113, 116, 118, 119, 122, 124, 126, 132, 133, 134, 135, 140, 141, 142, 143, 146, 148, 149, 154, 156, 158, 159, 160, 161, 162, 167, 168, 170, 172, 174, 175, 176, 177, 181, 184, 185, 188, 190, 191, 193, 199, 201, 202, 203, 206, 207, 209, 211, 213, 216, 217, 218, 227, 229, 231, 233, 238, 243, 244, 245, 246, 247, 248, 251, 252];
+pub const SMAZ_CB_LEN1: [u8; 33] = [0, 2, 3, 4, 6, 8, 9, 10, 12, 18, 22, 24, 28,
+38, 44, 45, 49, 57, 59, 60, 65, 81, 83, 90, 101, 109, 110, 197, 204, 219, 222,
+225, 250];
+
+pub const SMAZ_CB_LEN2: [u8; 121] = [5, 11, 14, 15, 16, 17, 20, 21, 23, 25, 26,
+27, 29, 30, 31, 33, 35, 36, 37, 39, 41, 42, 46, 47, 51, 52, 53, 54, 56, 58, 61,
+62, 66, 69, 71, 73, 74, 75, 77, 79, 80, 84, 85, 87, 88, 91, 92, 94, 95, 96, 98,
+102, 104, 106, 108, 111, 114, 115, 117, 120, 121, 123, 125, 127, 129, 130, 131,
+136, 137, 138, 139, 144, 145, 147, 150, 151, 152, 153, 157, 163, 164, 165, 166,
+169, 171, 173, 178, 179, 180, 182, 183, 186, 187, 189, 192, 194, 195, 196, 200,
+205, 208, 212, 214, 215, 220, 221, 223, 224, 226, 228, 230, 232, 234, 235, 236,
+237, 239, 240, 241, 242, 249];
+
+pub const SMAZ_CB_LEN3: [u8; 88] = [1, 7, 13, 19, 32, 34, 40, 50, 55, 63, 64,
+68, 70, 72, 76, 78, 82, 89, 97, 99, 105, 107, 112, 113, 116, 118, 119, 122,
+124, 126, 132, 133, 134, 135, 140, 141, 142, 143, 146, 148, 149, 154, 156, 158,
+159, 160, 161, 162, 167, 168, 170, 172, 174, 175, 176, 177, 181, 184, 185, 188,
+190, 191, 193, 199, 201, 202, 203, 206, 207, 209, 211, 213, 216, 217, 218, 227,
+229, 231, 233, 238, 243, 244, 245, 246, 247, 248, 251, 252];
+
 pub const SMAZ_CB_LEN4: [u8; 8] = [48, 86, 93, 103, 128, 155, 198, 253];
 pub const SMAZ_CB_LEN5: [u8; 3] = [43, 100, 210];
 
-
-pub const SMAZ_CHARS_USED: [u8; 36] = [10, 13, 32, 34, 44, 45, 46, 47, 58, 60, 61, 62, 84, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112, 114, 115, 116, 117, 118, 119, 120, 121, 122];
+pub const SMAZ_CHARS_USED: [u8; 36] = [10, 13, 32, 34, 44, 45, 46, 47, 58, 60,
+61, 62, 84, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112,
+114, 115, 116, 117, 118, 119, 120, 121, 122];
 
 
 fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
@@ -199,7 +219,8 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
         // to short-circuit the logic
         // and avoid the (comparatively) costly 7 char comparison
         // since, after all, 90+% of the time it won't be http://.
-        if input[inputoffset] == b'h' && input.len()-inputoffset >= 7 && input!(7) == *b"http://" {
+        if input[inputoffset] == b'h' && input.len()-inputoffset >= 7
+            && input!(7) == *b"http://" {
             opcode = Some(67);
             inputoffset += 7;
         } else if SMAZ_CHARS_USED.contains(&input[inputoffset]) {
@@ -239,7 +260,8 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
 
         // Flush the verbatim buffer if we've hit the 256 char limit
         // or if we've hit the end of the string.
-        if (input.len() == inputoffset || verbatim_buffer.len() == 256) && !verbatim_buffer.is_empty() {
+        if (input.len() == inputoffset || verbatim_buffer.len() == 256)
+            && !verbatim_buffer.is_empty() {
             flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
         }
     }
@@ -346,10 +368,15 @@ pub fn generate_compression_codebook() {
     let mut book: Vec<String> = vec![];
     for j in 0..SMAZ_CB.len() {
         let element = SMAZ_CB[j];
-        book.push(format!("b\"\\x{:02X}{}\\x{:02X}\"", element.len(), element.replace('\r', "\\r").replace('\n', "\\n").replace('"', "\\\""),
+        book.push(format!("b\"\\x{:02X}{}\\x{:02X}\"", element.len(),
+                                                       element
+                                                        .replace('\r', "\\r")
+                                                        .replace('\n', "\\n")
+                                                        .replace('"', "\\\""),
                                                        j));
     }
-    println!("pub static SMAZ_COMPRESSION_CB: [&[u8]; {}] = [{}];", book.len(), book.join(", "));
+    println!("pub static SMAZ_COMPRESSION_CB: [&[u8]; {}] = [{}];",
+                book.len(), book.join(", "));
 }
 
 pub fn list_contains_characters() {
