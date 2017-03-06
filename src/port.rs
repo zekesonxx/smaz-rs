@@ -83,29 +83,6 @@ pub static SMAZ_CB: [&'static str; 254] = [
 "e, ", " it", "whi", " ma", "ge", "x", "e c", "men", ".com"
 ];
 
-pub const SMAZ_CB_LEN1: [u8; 33] = [0, 2, 3, 4, 6, 8, 9, 10, 12, 18, 22, 24, 28,
-38, 44, 45, 49, 57, 59, 60, 65, 81, 83, 90, 101, 109, 110, 197, 204, 219, 222,
-225, 250];
-
-pub const SMAZ_CB_LEN2: [u8; 121] = [5, 11, 14, 15, 16, 17, 20, 21, 23, 25, 26,
-27, 29, 30, 31, 33, 35, 36, 37, 39, 41, 42, 46, 47, 51, 52, 53, 54, 56, 58, 61,
-62, 66, 69, 71, 73, 74, 75, 77, 79, 80, 84, 85, 87, 88, 91, 92, 94, 95, 96, 98,
-102, 104, 106, 108, 111, 114, 115, 117, 120, 121, 123, 125, 127, 129, 130, 131,
-136, 137, 138, 139, 144, 145, 147, 150, 151, 152, 153, 157, 163, 164, 165, 166,
-169, 171, 173, 178, 179, 180, 182, 183, 186, 187, 189, 192, 194, 195, 196, 200,
-205, 208, 212, 214, 215, 220, 221, 223, 224, 226, 228, 230, 232, 234, 235, 236,
-237, 239, 240, 241, 242, 249];
-
-pub const SMAZ_CB_LEN3: [u8; 88] = [1, 7, 13, 19, 32, 34, 40, 50, 55, 63, 64,
-68, 70, 72, 76, 78, 82, 89, 97, 99, 105, 107, 112, 113, 116, 118, 119, 122,
-124, 126, 132, 133, 134, 135, 140, 141, 142, 143, 146, 148, 149, 154, 156, 158,
-159, 160, 161, 162, 167, 168, 170, 172, 174, 175, 176, 177, 181, 184, 185, 188,
-190, 191, 193, 199, 201, 202, 203, 206, 207, 209, 211, 213, 216, 217, 218, 227,
-229, 231, 233, 238, 243, 244, 245, 246, 247, 248, 251, 252];
-
-pub const SMAZ_CB_LEN4: [u8; 8] = [48, 86, 93, 103, 128, 155, 198, 253];
-pub const SMAZ_CB_LEN5: [u8; 3] = [43, 100, 210];
-
 pub const SMAZ_CHARS_USED: [u8; 36] = [10, 13, 32, 34, 44, 45, 46, 47, 58, 60,
 61, 62, 84, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112,
 114, 115, 116, 117, 118, 119, 120, 121, 122];
@@ -122,71 +99,6 @@ fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
     }
 }
 
-#[allow(explicit_iter_loop)]
-pub fn raw_compress(input: &[u8]) -> Vec<u8> {
-    let mut inputoffset = 0usize;
-    let mut output = Vec::with_capacity(input.len());
-    let mut verbatim_buffer: Vec<u8> = Vec::with_capacity(32);
-
-    macro_rules! input {
-        ($pos: expr) => (input[inputoffset..inputoffset+$pos])
-    }
-
-    macro_rules! findlen {
-        ($len: expr, $lenarr: expr, $maxlen: expr, $opcode: expr) => (
-            if $maxlen >= $len && $opcode.is_none() {
-                for i in $lenarr.iter() {
-                    if input!($len) == (*SMAZ_CB[*i as usize].as_bytes()) {
-                        $opcode = Some(*i);
-                        inputoffset += $len;
-                        break;
-                    }
-                }
-            }
-        )
-    }
-    while inputoffset < input.len() {
-
-        // length of the remainder of the string,
-        // otherwise length 7 (the longest opcode)
-        let maxlen = cmp::min(input.len()-inputoffset, 7);
-        let mut opcode: Option<u8> = None;
-
-        if maxlen == 7 && input!(7) == *b"http://" {
-            opcode = Some(67);
-            inputoffset += 7;
-        }
-        findlen!(5, SMAZ_CB_LEN5, maxlen, opcode);
-        findlen!(4, SMAZ_CB_LEN4, maxlen, opcode);
-        findlen!(3, SMAZ_CB_LEN3, maxlen, opcode);
-        findlen!(2, SMAZ_CB_LEN2, maxlen, opcode);
-        findlen!(1, SMAZ_CB_LEN1, maxlen, opcode);
-
-
-        // If we didn't find it anywhere in the code table
-        // add it to the verbatim buffer
-        if let Some(opcode) = opcode {
-            if !verbatim_buffer.is_empty() {
-                flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
-            }
-            output.push(opcode);
-        } else {
-            verbatim_buffer.push(input[inputoffset]);
-            inputoffset += 1;
-        }
-
-
-        // Flush the verbatim buffer if we've hit the 256 char limit
-        // or if we've hit the end of the string.
-        if !verbatim_buffer.is_empty() && (input.len() == inputoffset || verbatim_buffer.len() == 256) {
-            flush_verbatim_buffer(&mut output, &mut verbatim_buffer);
-        }
-    }
-    output.shrink_to_fit();
-    output
-}
-
-
 lazy_static! {
     static ref SORTED_CB: Vec<&'static [u8]> = {
         let mut k = Vec::from(SMAZ_COMPRESSION_CB.as_ref());
@@ -195,7 +107,7 @@ lazy_static! {
     };
 }
 
-pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
+pub fn raw_compress(input: &[u8]) -> Vec<u8> {
     let mut inputoffset = 0usize;
     let mut output = Vec::with_capacity(input.len());
     let mut verbatim_buffer: Vec<u8> = Vec::with_capacity(32);
@@ -208,7 +120,7 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
 
     while inputoffset < input.len() {
         // length of the remainder of the string,
-        // otherwise length 7 (the longest opcode)
+        // otherwise length 5
         let maxlen = cmp::min(input.len()-inputoffset, 5);
 
         // Reset the opcode variable
@@ -271,7 +183,7 @@ pub fn lookup_table_compress(input: &[u8]) -> Vec<u8> {
 }
 
 pub fn compress(input: &[u8]) -> Vec<u8> {
-    let mut output = lookup_table_compress(input);
+    let mut output = raw_compress(input);
 
     // Worst-case scenario resolution
     let worst_case = input.len()+(2*(input.len())/256);
@@ -337,32 +249,6 @@ pub fn decompress(input: &[u8]) -> Vec<u8> {
     output
 }
 
-pub fn generate_opcode_len_arrays() {
-    let mut one: Vec<u8> = Vec::with_capacity(34);
-    let mut two: Vec<u8> = Vec::with_capacity(120);
-    let mut three: Vec<u8> = Vec::with_capacity(87);
-    let mut four: Vec<u8> = Vec::with_capacity(8);
-    let mut five: Vec<u8> = Vec::with_capacity(3);
-
-    for j in 0..SMAZ_CB.len() as u8 {
-        match SMAZ_CB[j as usize].len() {
-            1 => one.push(j),
-            2 => two.push(j),
-            3 => three.push(j),
-            4 => four.push(j),
-            5 => five.push(j),
-            _ => {}
-        }
-    }
-    println!("pub const SMAZ_CB_LEN1: [u8; {}] = {:?};", one.len(), one);
-    println!("pub const SMAZ_CB_LEN2: [u8; {}] = {:?};", two.len(), two);
-    println!("pub const SMAZ_CB_LEN3: [u8; {}] = {:?};", three.len(), three);
-    println!("pub const SMAZ_CB_LEN4: [u8; {}] = {:?};", four.len(), four);
-    println!("pub const SMAZ_CB_LEN5: [u8; {}] = {:?};", five.len(), five);
-    println!("pub const SMAZ_CB_LEN7: [u8; 1] = [67];");
-
-}
-
 #[allow(needless_range_loop)]
 pub fn generate_compression_codebook() {
     let mut book: Vec<String> = vec![];
@@ -389,13 +275,14 @@ pub fn list_contains_characters() {
         }
     }
     chars.sort();
-    println!("chars in use: {:?}", chars);
+    println!("pub const SMAZ_CHARS_USED: [u8; {}] = {:?};", chars.len(), chars);
 }
 
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cbinding::*;
     use test::Bencher;
     use rand::{thread_rng, Rng};
 
@@ -425,6 +312,9 @@ mod tests {
 
     #[bench]
     fn bench_compress_rust_ver(b: &mut Bencher) {
+        //to make sure the lazy_static'd codebook is sorted already
+        let _ = raw_compress(b"cats");
+
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
@@ -434,24 +324,11 @@ mod tests {
     }
 
     #[bench]
-    fn bench_compress_rust_lookup_table_ver(b: &mut Bencher) {
-        //to make sure the lazy_static'd codebook is sorted already
-        let _ = lookup_table_compress(b"cats");
-
-        let mut rng = thread_rng();
-        b.iter(|| {
-            let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
-            let compressed = lookup_table_compress(line);
-            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
-        });
-    }
-
-    #[bench]
     fn bench_compress_c_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
-            let compressed = super::super::smaz_compress_clean(line);
+            let compressed = smaz_compress_clean(line);
             assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
         });
     }
@@ -462,7 +339,7 @@ mod tests {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
-            let compressed = super::super::smaz_compress_clean(line);
+            let compressed = smaz_compress_clean(line);
             assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
         });
     }
@@ -472,8 +349,8 @@ mod tests {
         let mut rng = thread_rng();
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
-            let compressed = super::super::smaz_compress_clean(line);
-            assert_eq!(super::super::smaz_decompress_clean(compressed.as_slice()).as_slice(), line);
+            let compressed = smaz_compress_clean(line);
+            assert_eq!(smaz_decompress_clean(compressed.as_slice()).as_slice(), line);
         });
     }
 }

@@ -9,9 +9,9 @@ smaz works on a single-byte lookup table, spanning bytes 0-253.
 You can find the lookup table as array `smaz_rcb` in the original `smaz.c` or as `SMAZ_CB` in my Rust port.
 
 There are:
-* 34 one-byte opcodes (ex "e")
-* 120 two-byte opcodes (ex "he")
-* 87 three-byte opcodes (ex "the")
+* 33 one-byte opcodes (ex "e")
+* 121 two-byte opcodes (ex "he")
+* 88 three-byte opcodes (ex "the")
 * 8 four-byte opcodes (ex "this")
 * 3 five-byte opcodes ("which", "there", and "their")
 * 0 six-byte opcodes
