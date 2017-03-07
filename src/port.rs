@@ -206,7 +206,16 @@ pub fn compress(input: &[u8]) -> Vec<u8> {
     output
 }
 
-pub fn decompress(input: &[u8]) -> Vec<u8> {
+macro_rules! unwrap_or_none {
+    ($thing: expr) => (
+        match $thing {
+            Some(k) => k,
+            None => return None
+        }
+        )
+}
+
+pub fn decompress(input: &[u8]) -> Option<Vec<u8>> {
     // rough guess is 50% or worse compression,
     // just to try to minimize reallocations.
     let mut output = Vec::with_capacity(input.len()*2);
@@ -220,7 +229,7 @@ pub fn decompress(input: &[u8]) -> Vec<u8> {
             // | 0xFE | the byte |
             // +------+----------+
 
-            output.push(*iter.next().unwrap());
+            output.push(*unwrap_or_none!(iter.next()));
         } else if *c == 255 {
             // Verbatim string
             // This goes:
@@ -228,13 +237,13 @@ pub fn decompress(input: &[u8]) -> Vec<u8> {
             // | 0xFF | length | the string |
             // +------+--------+------------+
 
-            let len = *iter.next().unwrap();
+            let len = *unwrap_or_none!(iter.next());
 
             // the length is off by one
             // because if it was length 1, it would use the verbatim byte.
             // a +1 is also in the original C decompressor code
             for _ in 0..len+1 {
-                output.push(*iter.next().unwrap());
+                output.push(*unwrap_or_none!(iter.next()));
             }
         } else {
             // Codebook entry
@@ -246,7 +255,7 @@ pub fn decompress(input: &[u8]) -> Vec<u8> {
         }
     }
     output.shrink_to_fit();
-    output
+    Some(output)
 }
 
 #[allow(needless_range_loop)]
@@ -290,7 +299,7 @@ mod tests {
         ($input: expr, $correct: expr) => (
             let compressed = compress($input);
             assert_eq!(compressed.as_slice(), $correct);
-            assert_eq!(decompress(compressed.as_slice()), $input);
+            assert_eq!(decompress(compressed.as_slice()).unwrap(), $input);
         )
     }
 
@@ -319,7 +328,7 @@ mod tests {
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
             let compressed = raw_compress(line);
-            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+            assert_eq!(decompress(compressed.as_slice()).unwrap().as_slice(), line);
         });
     }
 
@@ -329,7 +338,7 @@ mod tests {
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
             let compressed = smaz_compress_clean(line);
-            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+            assert_eq!(decompress(compressed.as_slice()).unwrap().as_slice(), line);
         });
     }
 
@@ -340,7 +349,7 @@ mod tests {
         b.iter(|| {
             let line = rng.choose(&FIXTURE_LINES).unwrap().as_bytes();
             let compressed = smaz_compress_clean(line);
-            assert_eq!(decompress(compressed.as_slice()).as_slice(), line);
+            assert_eq!(decompress(compressed.as_slice()).unwrap().as_slice(), line);
         });
     }
 

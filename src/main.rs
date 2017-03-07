@@ -6,7 +6,7 @@ extern crate test;
 
 #[macro_use] extern crate lazy_static;
 
-#[cfg(feature = "cbinding")]
+#[cfg(test)]
 extern crate rand;
 #[cfg(feature = "cbinding")]
 extern crate libc;
@@ -75,7 +75,7 @@ fn main() {
         println!("   cver: {:?}", cver_de);
         println!("         {:?}", String::from_utf8(cver_de));
         println!("rustver: {:?}", rustver_de);
-        println!("         {:?}", String::from_utf8(rustver_de));
+        println!("         {:?}", String::from_utf8(rustver_de.unwrap()));
 
     }
 }
@@ -96,7 +96,7 @@ fn main() {
         println!("----");
         println!("decompressed:");
         println!("rustver: {:?}", rustver_de);
-        println!("         {:?}", String::from_utf8(rustver_de));
+        println!("         {:?}", String::from_utf8(rustver_de.unwrap()));
 
     }
 }
