@@ -94,6 +94,13 @@ pub const SMAZ_CHARS_USED: [u8; 36] = [10, 13, 32, 34, 44, 45, 46, 47, 58, 60,
 114, 115, 116, 117, 118, 119, 120, 121, 122];
 
 
+fn is_smaz_char(input: &u8) -> bool {
+    // ["10", "13", "32", "34", "44-47", "58", "60-62", "84", "97-105", "108-112", "114-122"]
+    *input == 10 || *input == 13 || *input == 32 || *input == 34 || (*input >= 44 && *input <= 47) ||
+        *input == 58 || (*input >= 60 && *input <= 62) || *input == 84 || (*input >= 97 && *input <= 105)
+        || (*input >= 108 && *input <= 112) || (*input >= 114 && *input <= 122)
+}
+
 fn flush_verbatim_buffer(output: &mut Vec<u8>, buffer: &mut Vec<u8>) {
     if buffer.len() == 1 {
         output.push(254);
@@ -138,6 +145,7 @@ pub fn raw_compress(input: &[u8]) -> Vec<u8> {
         // We're resetting instead of just `let`ing to avoid an allocation
         opcode = None;
 
+
         // We do an initial check against the first character
         // to short-circuit the logic
         // and avoid the (comparatively) costly 7 char comparison
@@ -146,7 +154,7 @@ pub fn raw_compress(input: &[u8]) -> Vec<u8> {
             && input!(7) == *b"http://" {
             opcode = Some(67);
             inputoffset += 7;
-        } else if SMAZ_CHARS_USED.contains(&input[inputoffset]) {
+        } else if is_smaz_char(&input[inputoffset]) {
             for len in (0..maxlen+1).rev() {
                 let index = SORTED_CB.binary_search_by(|probe| {
                     use std::cmp::Ordering::*;
