@@ -15,7 +15,7 @@ smaz is largely designed for human-written, English text. Humans like referring 
 * Opcode `67`, currently `"http://"`, would become `"://"`.
 * Opcode `40`, currently `"   "` (3 spaces), would become `"http"`.
 
-Compressing `http://` down to a single byte is certainly helpful, and back in 2008 when smez was written it was probably the only concern. In 2017, where HTTPS is prevalent everywhere, `https://` currently takes 9 bytes (which is an enlargement!). Under this change `http://` would take 2 bytes, and `https://` would take 3.
+Compressing `http://` down to a single byte is certainly helpful, and back in 2008 when smez was written HTTPS wasn't very widespread in day-to-day use. In 2017, where HTTPS is prevalent everywhere, `https://` currently takes 9 bytes (which is an enlargement!). Under this change `http://` would take 2 bytes, and `https://` would take 3.
 
 An alternative option would be to leave opcode `67` alone, and just change opcode `40` to `https://`. This would give identical compression numbers to HTTP and HTTPS URLs, but doesn't support other URLs.
 

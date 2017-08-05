@@ -3,6 +3,7 @@
 use std::cmp;
 
 /// Compression Codebook
+///
 /// This is in the format: `[length of string][string][opcode for string]`
 pub static SMAZ_COMPRESSION_CB: [&[u8]; 254] = [b"\x01 \x00", b"\x03the\x01",
 b"\x01e\x02", b"\x01t\x03", b"\x01a\x04", b"\x02of\x05", b"\x01o\x06",
@@ -58,7 +59,9 @@ b"\x03e, \xF5", b"\x03 it\xF6", b"\x03whi\xF7", b"\x03 ma\xF8", b"\x02ge\xF9",
 b"\x01x\xFA", b"\x03e c\xFB", b"\x03men\xFC", b"\x04.com\xFD"];
 
 
-/// Decompression Codebook
+/// Codebook
+///
+/// The compression function uses `SMAZ_COMPRESSION_CB` for speed reasons.
 pub static SMAZ_CB: [&'static str; 254] = [
 " ", "the", "e", "t", "a", "of", "o", "and", "i", "n", "s", "e ", "r", " th",
 " t", "in", "he", "th", "h", "he ", "to", "\r\n", "l", "s ", "d", " a", "an",
@@ -83,6 +86,9 @@ pub static SMAZ_CB: [&'static str; 254] = [
 "e, ", " it", "whi", " ma", "ge", "x", "e c", "men", ".com"
 ];
 
+/// An array of all of the ASCII code points that exist in the smaz codebook.
+///
+/// This array is used to speed up compression.
 pub const SMAZ_CHARS_USED: [u8; 36] = [10, 13, 32, 34, 44, 45, 46, 47, 58, 60,
 61, 62, 84, 97, 98, 99, 100, 101, 102, 103, 104, 105, 108, 109, 110, 111, 112,
 114, 115, 116, 117, 118, 119, 120, 121, 122];
@@ -107,6 +113,11 @@ lazy_static! {
     };
 }
 
+/// The raw compression function.
+///
+/// This bypasses the worst-case scenario prevention.
+///
+/// Generally speaking, you'll never want to call this directly.
 pub fn raw_compress(input: &[u8]) -> Vec<u8> {
     let mut inputoffset = 0usize;
     let mut output = Vec::with_capacity(input.len());
@@ -182,6 +193,27 @@ pub fn raw_compress(input: &[u8]) -> Vec<u8> {
     output
 }
 
+/// Compresses an input array of characters
+///
+/// # Performance
+/// This Rust version performs about 3x slower than the original C version.
+///
+/// ```text
+/// test port::tests::bench_compress_c_ver    ... bench:       3,292 ns/iter (+/- 165)
+/// test port::tests::bench_compress_rust_ver ... bench:      10,551 ns/iter (+/- 564)
+/// ```
+///
+/// And, to be honest, I don't know if I can make it any faster.
+/// The C version is already optimized to within an inch of it's life.
+/// This Rust version is as close to the original as can be safely written.
+///
+/// However, having said all that, it's still *very* fast.
+/// I genuinely can't imagine a situation where you need that extra speed.
+///
+/// # Panics
+/// As far as I'm aware, this shouldn't be any possible way for this to panic.
+///
+///
 pub fn compress(input: &[u8]) -> Vec<u8> {
     let mut output = raw_compress(input);
 
@@ -215,6 +247,29 @@ macro_rules! unwrap_or_none {
         )
 }
 
+/// Decompresses a smaz-compressed array of bytes
+///
+/// This function has been extensively tested and should be 100% compatable
+/// with anything compressed by the original C version or the JavaScript version.
+///
+/// # Returns
+/// Returns `Some(x)`, where `x` is your decompressed string.
+///
+/// Returns `None` on a malformed input string.
+///
+/// # Performance
+/// This Rust version is very, *very*, slightly faster than the C version.
+///
+/// ```text
+/// test port::tests::bench_decompress_c      ... bench:       3,451 ns/iter (+/- 129)
+/// test port::tests::bench_decompress_rust   ... bench:       3,276 ns/iter (+/- 103)
+/// ```
+///
+/// I have no idea why. It's functionally a direct, identical port of the C version.
+/// I haven't even really tried to optimize it.
+///
+/// # Panics
+/// As far as I'm aware, this shouldn't be any possible way for this to panic.
 pub fn decompress(input: &[u8]) -> Option<Vec<u8>> {
     // rough guess is 50% or worse compression,
     // just to try to minimize reallocations.
@@ -237,7 +292,7 @@ pub fn decompress(input: &[u8]) -> Option<Vec<u8>> {
             // | 0xFF | length | the string |
             // +------+--------+------------+
 
-            let len = *unwrap_or_none!(iter.next());
+            let len = *unwrap_or_none!(iter.next()) as usize;
 
             // the length is off by one
             // because if it was length 1, it would use the verbatim byte.
@@ -258,6 +313,8 @@ pub fn decompress(input: &[u8]) -> Option<Vec<u8>> {
     Some(output)
 }
 
+
+/// Small bit of code used to pregenerate one of the compression arrays
 #[allow(needless_range_loop)]
 pub fn generate_compression_codebook() {
     let mut book: Vec<String> = vec![];
@@ -274,6 +331,7 @@ pub fn generate_compression_codebook() {
                 book.len(), book.join(", "));
 }
 
+/// Small bit of code used to pregenerate the other compression array
 pub fn list_contains_characters() {
     let mut chars: Vec<u8> = vec![];
     for entry in SMAZ_CB.iter() {
@@ -291,6 +349,7 @@ pub fn list_contains_characters() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "cbinding")]
     use cbinding::*;
     use test::Bencher;
     use rand::{thread_rng, Rng};
@@ -315,6 +374,27 @@ mod tests {
         compress_check_decompress!(b"there there DDD", b"\xD2\x0D\xA0\x00\xFF\x02\x44\x44\x44");
     }
 
+    #[test]
+    fn decompression_safety_tests() {
+        //// Literal string tests
+        // normal one
+        assert_eq!(decompress(b"\xFF\x02cat"), Some(Vec::from("cat")));
+        // literal strings without their content
+        assert_eq!(decompress(b"\xFF\x00"), None);
+        assert_eq!(decompress(b"\xFF\x01"), None);
+        // maximum size strings
+        assert_eq!(decompress(b"\xFF\xFF"), None);
+        assert_eq!(decompress(b"\xFF\xFFcat"), None);
+
+        //// Literal Byte Tests
+        // normal one
+        assert_eq!(decompress(b"\xFEc"), Some(Vec::from("c")));
+        // missing the literal byte
+        assert_eq!(decompress(b"\xFE"), None);
+        // smaz is neither utf8 aware or biased.
+        assert_eq!(decompress(b"\xFE\xFE"), Some(vec![254]));
+    }
+
     lazy_static! {
         static ref FIXTURE_LINES: Vec<&'static str> = include_str!("../test-fixture.txt").lines().collect();
     }
@@ -332,6 +412,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "cbinding")]
     #[bench]
     fn bench_compress_c_ver(b: &mut Bencher) {
         let mut rng = thread_rng();
@@ -343,6 +424,7 @@ mod tests {
     }
 
 
+    #[cfg(feature = "cbinding")]
     #[bench]
     fn bench_decompress_rust(b: &mut Bencher) {
         let mut rng = thread_rng();
@@ -353,6 +435,7 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "cbinding")]
     #[bench]
     fn bench_decompress_c(b: &mut Bencher) {
         let mut rng = thread_rng();
