@@ -138,7 +138,7 @@ pub fn raw_compress(input: &[u8]) -> Vec<u8> {
         // We're resetting instead of just `let`ing to avoid an allocation
         opcode = None;
 
-        // We do an inital check against the first character
+        // We do an initial check against the first character
         // to short-circuit the logic
         // and avoid the (comparatively) costly 7 char comparison
         // since, after all, 90+% of the time it won't be http://.
@@ -249,7 +249,7 @@ macro_rules! unwrap_or_none {
 
 /// Decompresses a smaz-compressed array of bytes
 ///
-/// This function has been extensively tested and should be 100% compatable
+/// This function has been extensively tested and should be 100% compatible
 /// with anything compressed by the original C version or the JavaScript version.
 ///
 /// # Returns
